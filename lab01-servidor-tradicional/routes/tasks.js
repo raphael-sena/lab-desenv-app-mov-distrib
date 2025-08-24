@@ -2,6 +2,7 @@ const express = require('express');
 const { v4: uuidv4 } = require('uuid');
 const Task = require('../model/Task');
 const database = require('../database/database');
+const memoryCache = require('../config/memoryCache');
 const { authMiddleware } = require('../middleware/auth');
 const { validate } = require('../middleware/validation');
 
@@ -10,10 +11,21 @@ const router = express.Router();
 // Todas as rotas requerem autenticação
 router.use(authMiddleware);
 
-// Listar tarefas com paginação
+// Listar tarefas com paginação e cache
 router.get('/', async (req, res) => {
     try {
         const { completed, priority, page = 1, limit = 10 } = req.query;
+        const pageNum = Math.max(parseInt(page), 1);
+        const limitNum = Math.max(parseInt(limit), 1);
+
+        // Cache baseado em usuário, filtros, página e limite
+        const cacheKey = `tasks:${req.user.id}:completed=${completed}:priority=${priority}:page=${pageNum}:limit=${limitNum}`;
+        
+        const cached = memoryCache.get(cacheKey);
+        if (cached) {
+            return res.json(cached);
+        }
+
         let sql = 'SELECT * FROM tasks WHERE userId = ?';
         let countSql = 'SELECT COUNT(*) as total FROM tasks WHERE userId = ?';
         const params = [req.user.id];
@@ -35,10 +47,6 @@ router.get('/', async (req, res) => {
         }
 
         sql += ' ORDER BY createdAt DESC';
-
-        // Paginação
-        const pageNum = Math.max(parseInt(page), 1);
-        const limitNum = Math.max(parseInt(limit), 1);
         const offset = (pageNum - 1) * limitNum;
         sql += ' LIMIT ? OFFSET ?';
         params.push(limitNum, offset);
@@ -50,7 +58,7 @@ router.get('/', async (req, res) => {
         const total = countRow ? countRow.total : 0;
         const tasks = rows.map(row => new Task({...row, completed: row.completed === 1}));
 
-        res.json({
+        const response = {
             success: true,
             data: tasks.map(task => task.toJSON()),
             pagination: {
@@ -59,7 +67,10 @@ router.get('/', async (req, res) => {
                 total,
                 totalPages: Math.ceil(total / limitNum)
             }
-        });
+        };
+        // Cache 30 segundos
+        memoryCache.set(cacheKey, response, 30000);
+        res.json(response);
     } catch (error) {
         res.status(500).json({ success: false, message: 'Erro interno do servidor' });
     }
@@ -89,6 +100,9 @@ router.post('/', validate('task'), async (req, res) => {
             'INSERT INTO tasks (id, title, description, priority, userId) VALUES (?, ?, ?, ?, ?)',
             [task.id, task.title, task.description, task.priority, task.userId]
         );
+
+        // Invalidar todos os caches para este usuário
+        memoryCache.clear();
 
         res.status(201).json({
             success: true,
@@ -150,6 +164,8 @@ router.put('/:id', async (req, res) => {
 
         const task = new Task({...updatedRow, completed: updatedRow.completed === 1});
         
+        // Invalidar todos os caches para este usuário
+        memoryCache.clear();
         res.json({
             success: true,
             message: 'Tarefa atualizada com sucesso',
@@ -174,7 +190,9 @@ router.delete('/:id', async (req, res) => {
                 message: 'Tarefa não encontrada'
             });
         }
-
+       
+        // Invalidar todos os caches para este usuário
+        memoryCache.clear();
         res.json({
             success: true,
             message: 'Tarefa deletada com sucesso'
