@@ -10,31 +10,55 @@ const router = express.Router();
 // Todas as rotas requerem autenticação
 router.use(authMiddleware);
 
-// Listar tarefas
+// Listar tarefas com paginação
 router.get('/', async (req, res) => {
     try {
-        const { completed, priority } = req.query;
+        const { completed, priority, page = 1, limit = 10 } = req.query;
         let sql = 'SELECT * FROM tasks WHERE userId = ?';
+        let countSql = 'SELECT COUNT(*) as total FROM tasks WHERE userId = ?';
         const params = [req.user.id];
+        const countParams = [req.user.id];
 
         if (completed !== undefined) {
             sql += ' AND completed = ?';
-            params.push(completed === 'true' ? 1 : 0);
+            countSql += ' AND completed = ?';
+            const completedVal = completed === 'true' ? 1 : 0;
+            params.push(completedVal);
+            countParams.push(completedVal);
         }
         
         if (priority) {
             sql += ' AND priority = ?';
+            countSql += ' AND priority = ?';
             params.push(priority);
+            countParams.push(priority);
         }
 
         sql += ' ORDER BY createdAt DESC';
 
-        const rows = await database.all(sql, params);
+        // Paginação
+        const pageNum = Math.max(parseInt(page), 1);
+        const limitNum = Math.max(parseInt(limit), 1);
+        const offset = (pageNum - 1) * limitNum;
+        sql += ' LIMIT ? OFFSET ?';
+        params.push(limitNum, offset);
+
+        const [rows, countRow] = await Promise.all([
+            database.all(sql, params),
+            database.get(countSql, countParams)
+        ]);
+        const total = countRow ? countRow.total : 0;
         const tasks = rows.map(row => new Task({...row, completed: row.completed === 1}));
 
         res.json({
             success: true,
-            data: tasks.map(task => task.toJSON())
+            data: tasks.map(task => task.toJSON()),
+            pagination: {
+                page: pageNum,
+                limit: limitNum,
+                total,
+                totalPages: Math.ceil(total / limitNum)
+            }
         });
     } catch (error) {
         res.status(500).json({ success: false, message: 'Erro interno do servidor' });
@@ -76,7 +100,7 @@ router.post('/', validate('task'), async (req, res) => {
     }
 });
 
-// Buscar tarefa por ID
+// Buscar tarefa por ID (sem paginação, mas mantendo a estrutura)
 router.get('/:id', async (req, res) => {
     try {
         const row = await database.get(
@@ -94,7 +118,8 @@ router.get('/:id', async (req, res) => {
         const task = new Task({...row, completed: row.completed === 1});
         res.json({
             success: true,
-            data: task.toJSON()
+            data: task.toJSON(),
+            pagination: null
         });
     } catch (error) {
         res.status(500).json({ success: false, message: 'Erro interno do servidor' });
