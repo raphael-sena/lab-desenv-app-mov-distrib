@@ -15,12 +15,12 @@ router.use(authMiddleware);
 // Listar tarefas com paginação e cache
 router.get('/', async (req, res) => {
     try {
-        const { completed, priority, page = 1, limit = 10 } = req.query;
+        const { completed, priority, page = 1, limit = 10, date, category, tags } = req.query;
         const pageNum = Math.max(parseInt(page), 1);
         const limitNum = Math.max(parseInt(limit), 1);
 
         // Cache baseado em usuário, filtros, página e limite
-        const cacheKey = `tasks:${req.user.id}:completed=${completed}:priority=${priority}:page=${pageNum}:limit=${limitNum}`;
+        const cacheKey = `tasks:${req.user.id}:completed=${completed}:priority=${priority}:date=${date}:category=${category}:tags=${tags}:page=${pageNum}:limit=${limitNum}`;
 
         const cached = memoryCache.get(cacheKey);
         if (cached) {
@@ -49,6 +49,34 @@ router.get('/', async (req, res) => {
             countSql += ' AND priority = ?';
             params.push(priority);
             countParams.push(priority);
+        }
+
+        if (date) {
+            sql += ' AND DATE(createdAt) = DATE(?)';
+            countSql += ' AND DATE(createdAt) = DATE(?)';
+            params.push(date);
+            countParams.push(date);
+        }
+
+        if (category) {
+            sql += ' AND category = ?';
+            countSql += ' AND category = ?';
+            params.push(category);
+            countParams.push(category);
+        }
+
+        if (tags) {
+            // Tags podem ser separadas por vírgula, correspondendo a qualquer tag
+            const tagList = tags.split(',').map(t => t.trim()).filter(Boolean);
+            if (tagList.length > 0) {
+                const tagConditions = tagList.map(() => `tags LIKE ?`).join(' OR ');
+                sql += ` AND (${tagConditions})`;
+                countSql += ` AND (${tagConditions})`;
+                tagList.forEach(tag => {
+                    params.push(`%${tag}%`);
+                    countParams.push(`%${tag}%`);
+                });
+            }
         }
 
         sql += ' ORDER BY createdAt DESC';
@@ -185,11 +213,18 @@ router.get('/:id', async (req, res) => {
 // Atualizar tarefa
 router.put('/:id', async (req, res) => {
     try {
-        const { title, description, completed, priority } = req.body;
-        
+        const { title, description, completed, priority, category, tags } = req.body;
+        // tags: array or comma-separated string
+        let tagsStr = '';
+        if (Array.isArray(tags)) {
+            tagsStr = tags.join(',');
+        } else if (typeof tags === 'string') {
+            tagsStr = tags;
+        }
+
         const result = await database.run(
-            'UPDATE tasks SET title = ?, description = ?, completed = ?, priority = ? WHERE id = ? AND userId = ?',
-            [title, description, completed ? 1 : 0, priority, req.params.id, req.user.id]
+            'UPDATE tasks SET title = ?, description = ?, completed = ?, priority = ?, category = ?, tags = ? WHERE id = ? AND userId = ?',
+            [title, description, completed ? 1 : 0, priority, category, tagsStr, req.params.id, req.user.id]
         );
 
         if (result.changes === 0) {

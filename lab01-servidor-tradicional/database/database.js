@@ -25,17 +25,19 @@ class Database {
                 createdAt DATETIME DEFAULT CURRENT_TIMESTAMP
             )`;
 
-    const taskTable = `
-            CREATE TABLE IF NOT EXISTS tasks (
-                id TEXT PRIMARY KEY,
-                title TEXT NOT NULL,
-                description TEXT,
-                completed INTEGER DEFAULT 0,
-                priority TEXT DEFAULT 'medium',
-                userId TEXT NOT NULL,
-                createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY (userId) REFERENCES users (id)
-            )`;
+  const taskTable = `
+      CREATE TABLE IF NOT EXISTS tasks (
+        id TEXT PRIMARY KEY,
+        title TEXT NOT NULL,
+        description TEXT,
+        completed INTEGER DEFAULT 0,
+        priority TEXT DEFAULT 'medium',
+        category TEXT,
+        tags TEXT,
+        userId TEXT NOT NULL,
+        createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (userId) REFERENCES users (id)
+      )`;
 
     return Promise.all([this.run(userTable), this.run(taskTable)]);
   }

@@ -5,8 +5,10 @@ class Task {
         this.description = data.description || '';
         this.completed = data.completed || false;
         this.priority = data.priority || 'medium';
-        this.userId = data.userId;
-        this.createdAt = data.createdAt;
+    this.category = data.category || null;
+    this.tags = Array.isArray(data.tags) ? data.tags : (typeof data.tags === 'string' ? data.tags.split(',').map(t => t.trim()).filter(Boolean) : []);
+    this.userId = data.userId;
+    this.createdAt = data.createdAt;
     }
 
     validate() {
@@ -17,7 +19,10 @@ class Task {
     }
 
     toJSON() {
-        return { ...this };
+        return {
+            ...this,
+            tags: this.tags
+        };
     }
 }
 
