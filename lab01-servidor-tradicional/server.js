@@ -3,6 +3,7 @@ const cors = require('cors');
 const bodyParser = require('body-parser');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
+const userRateLimit = require('./middleware/userRateLimit');
 
 const config = require('./config/database');
 const database = require('./database/database');
@@ -23,7 +24,6 @@ const app = express();
 
 // Middleware de segurança
 app.use(helmet());
-app.use(rateLimit(config.rateLimit));
 app.use(cors());
 
 // Parsing de dados
@@ -74,7 +74,8 @@ app.get('/health', (req, res) => {
 
 // API Routes
 app.use('/api/auth', authRoutes);
-app.use('/api/tasks', taskRoutes);
+// Aplica rate limit por usuário autenticado nas rotas de tasks
+app.use('/api/tasks', require('./middleware/auth').authMiddleware, userRateLimit(config.rateLimit), taskRoutes);
 
 // 404 handler
 app.use((req, res) => {
