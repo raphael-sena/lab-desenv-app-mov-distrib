@@ -3,6 +3,7 @@ const { v4: uuidv4 } = require('uuid');
 const Task = require('../model/Task');
 const database = require('../database/database');
 const memoryCache = require('../config/memoryCache');
+const logger = require('../config/logger');
 const { authMiddleware } = require('../middleware/auth');
 const { validate } = require('../middleware/validation');
 
@@ -20,9 +21,13 @@ router.get('/', async (req, res) => {
 
         // Cache baseado em usuário, filtros, página e limite
         const cacheKey = `tasks:${req.user.id}:completed=${completed}:priority=${priority}:page=${pageNum}:limit=${limitNum}`;
-        
+
         const cached = memoryCache.get(cacheKey);
         if (cached) {
+            logger.info('Cache hit for tasks list', {
+                userId: req.user.id,
+                query: req.query
+            });
             return res.json(cached);
         }
 
@@ -70,8 +75,21 @@ router.get('/', async (req, res) => {
         };
         // Cache 30 segundos
         memoryCache.set(cacheKey, response, 30000);
+        logger.info('Tasks listed', {
+            userId: req.user.id,
+            query: req.query,
+            total,
+            page: pageNum,
+            limit: limitNum
+        });
         res.json(response);
     } catch (error) {
+        logger.error('Erro ao listar tarefas', {
+            userId: req.user?.id,
+            error: error.message,
+            stack: error.stack,
+            query: req.query
+        });
         res.status(500).json({ success: false, message: 'Erro interno do servidor' });
     }
 });
@@ -103,13 +121,23 @@ router.post('/', validate('task'), async (req, res) => {
 
         // Invalidar todos os caches para este usuário
         memoryCache.clear();
-
+        logger.info('Task created', {
+            userId: req.user.id,
+            taskId: task.id,
+            title: task.title
+        });
         res.status(201).json({
             success: true,
             message: 'Tarefa criada com sucesso',
             data: task.toJSON()
         });
     } catch (error) {
+        logger.error('Erro ao criar tarefa', {
+            userId: req.user?.id,
+            error: error.message,
+            stack: error.stack,
+            body: req.body
+        });
         res.status(500).json({ success: false, message: 'Erro interno do servidor' });
     }
 });
@@ -123,6 +151,10 @@ router.get('/:id', async (req, res) => {
         );
 
         if (!row) {
+            logger.warn('Task not found', {
+                userId: req.user.id,
+                taskId: req.params.id
+            });
             return res.status(404).json({
                 success: false,
                 message: 'Tarefa não encontrada'
@@ -130,12 +162,22 @@ router.get('/:id', async (req, res) => {
         }
 
         const task = new Task({...row, completed: row.completed === 1});
+        logger.info('Task fetched', {
+            userId: req.user.id,
+            taskId: req.params.id
+        });
         res.json({
             success: true,
             data: task.toJSON(),
             pagination: null
         });
     } catch (error) {
+        logger.error('Erro ao buscar tarefa por ID', {
+            userId: req.user?.id,
+            taskId: req.params?.id,
+            error: error.message,
+            stack: error.stack
+        });
         res.status(500).json({ success: false, message: 'Erro interno do servidor' });
     }
 });
@@ -151,6 +193,10 @@ router.put('/:id', async (req, res) => {
         );
 
         if (result.changes === 0) {
+            logger.warn('Task not found for update', {
+                userId: req.user.id,
+                taskId: req.params.id
+            });
             return res.status(404).json({
                 success: false,
                 message: 'Tarefa não encontrada'
@@ -163,15 +209,25 @@ router.put('/:id', async (req, res) => {
         );
 
         const task = new Task({...updatedRow, completed: updatedRow.completed === 1});
-        
         // Invalidar todos os caches para este usuário
         memoryCache.clear();
+        logger.info('Task updated', {
+            userId: req.user.id,
+            taskId: req.params.id
+        });
         res.json({
             success: true,
             message: 'Tarefa atualizada com sucesso',
             data: task.toJSON()
         });
     } catch (error) {
+        logger.error('Erro ao atualizar tarefa', {
+            userId: req.user?.id,
+            taskId: req.params?.id,
+            error: error.message,
+            stack: error.stack,
+            body: req.body
+        });
         res.status(500).json({ success: false, message: 'Erro interno do servidor' });
     }
 });
@@ -185,19 +241,32 @@ router.delete('/:id', async (req, res) => {
         );
 
         if (result.changes === 0) {
+            logger.warn('Task not found for delete', {
+                userId: req.user.id,
+                taskId: req.params.id
+            });
             return res.status(404).json({
                 success: false,
                 message: 'Tarefa não encontrada'
             });
         }
-       
         // Invalidar todos os caches para este usuário
         memoryCache.clear();
+        logger.info('Task deleted', {
+            userId: req.user.id,
+            taskId: req.params.id
+        });
         res.json({
             success: true,
             message: 'Tarefa deletada com sucesso'
         });
     } catch (error) {
+        logger.error('Erro ao deletar tarefa', {
+            userId: req.user?.id,
+            taskId: req.params?.id,
+            error: error.message,
+            stack: error.stack
+        });
         res.status(500).json({ success: false, message: 'Erro interno do servidor' });
     }
 });
@@ -213,6 +282,10 @@ router.get('/stats/summary', async (req, res) => {
             FROM tasks WHERE userId = ?
         `, [req.user.id]);
 
+        logger.info('Task stats fetched', {
+            userId: req.user.id,
+            stats
+        });
         res.json({
             success: true,
             data: {
@@ -221,6 +294,11 @@ router.get('/stats/summary', async (req, res) => {
             }
         });
     } catch (error) {
+        logger.error('Erro ao buscar estatísticas', {
+            userId: req.user?.id,
+            error: error.message,
+            stack: error.stack
+        });
         res.status(500).json({ success: false, message: 'Erro interno do servidor' });
     }
 });

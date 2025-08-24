@@ -8,6 +8,7 @@ const config = require('./config/database');
 const database = require('./database/database');
 const authRoutes = require('./routes/auth');
 const taskRoutes = require('./routes/tasks');
+const logger = require('./config/logger');
 
 /**
  * Servidor de Aplicação Tradicional
@@ -29,9 +30,23 @@ app.use(cors());
 app.use(bodyParser.json({ limit: '10mb' }));
 app.use(bodyParser.urlencoded({ extended: true }));
 
-// Logging de requisições
+// Structured logging de requisições e respostas
 app.use((req, res, next) => {
-    console.log(`${new Date().toISOString()} - ${req.method} ${req.url}`);
+    const start = Date.now();
+    res.on('finish', () => {
+        const duration = Date.now() - start;
+        logger.info('request', {
+            method: req.method,
+            url: req.originalUrl,
+            status: res.statusCode,
+            ip: req.ip,
+            userAgent: req.headers['user-agent'],
+            durationMs: duration,
+            params: req.params,
+            query: req.query,
+            body: req.body
+        });
+    });
     next();
 });
 
@@ -63,6 +78,11 @@ app.use('/api/tasks', taskRoutes);
 
 // 404 handler
 app.use((req, res) => {
+    logger.warn('404 Not Found', {
+        method: req.method,
+        url: req.originalUrl,
+        ip: req.ip
+    });
     res.status(404).json({
         success: false,
         message: 'Endpoint não encontrado'
@@ -71,7 +91,16 @@ app.use((req, res) => {
 
 // Error handler global
 app.use((error, req, res, next) => {
-    console.error('Erro:', error);
+    logger.error('Erro interno do servidor', {
+        method: req.method,
+        url: req.originalUrl,
+        ip: req.ip,
+        stack: error.stack,
+        message: error.message,
+        params: req.params,
+        query: req.query,
+        body: req.body
+    });
     res.status(500).json({
         success: false,
         message: 'Erro interno do servidor'
@@ -82,13 +111,15 @@ app.use((error, req, res, next) => {
 async function startServer() {
     try {
         await database.init();
-        
+        logger.info('Servidor iniciado', {
+            port: config.port,
+            url: `http://localhost:${config.port}`,
+            health: `http://localhost:${config.port}/health`
+        });
         app.listen(config.port, () => {
-            console.log('🚀 =================================');
-            console.log(`🚀 Servidor iniciado na porta ${config.port}`);
-            console.log(`🚀 URL: http://localhost:${config.port}`);
-            console.log(`🚀 Health: http://localhost:${config.port}/health`);
-            console.log('🚀 =================================');
+            logger.info('Servidor ouvindo', {
+                port: config.port
+            });
         });
     } catch (error) {
         console.error('❌ Falha na inicialização:', error);
