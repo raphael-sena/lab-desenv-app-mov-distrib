@@ -1,0 +1,11 @@
+config:
+  target: "http://localhost:3000"
+  phases:
+    - duration: 60
+      arrivalRate: 1000   # 1000 usuários/segundo
+scenarios:
+  - flow:
+      - get:
+          url: "/api/tasks"
+          headers:
+            Authorization: "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6ImU5YmQ5MGVlLWYxNmItNDdiOC04ZjAzLWZlZjliODJkYThkNyIsImVtYWlsIjoicnNlbmFAZ21haWwuY29tIiwidXNlcm5hbWUiOiJzZW5hIiwiaWF0IjoxNzU2MDcyMTM5LCJleHAiOjE3NTYxNTg1Mzl9.aqZ2y8dBaO7AYr1qwYrqilpp9RBS-cA480g3tVXbycU"

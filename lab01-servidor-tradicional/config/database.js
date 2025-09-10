@@ -9,6 +9,6 @@ module.exports = {
     // Rate limiting
     rateLimit: {
         windowMs: 15 * 60 * 1000, // 15 minutos
-        max: 1000 // máximo 1000 requests por IP
+        max: 10000000000 // máximo 10000000000 requests por IP
     }
 };
