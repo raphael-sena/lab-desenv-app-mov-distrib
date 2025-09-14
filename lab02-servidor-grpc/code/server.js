@@ -2,6 +2,7 @@ const grpc = require('@grpc/grpc-js');
 const ProtoLoader = require('./utils/protoLoader');
 const AuthService = require('./services/AuthService');
 const TaskService = require('./services/TaskService');
+const AuthInterceptor = require('./middleware/auth');
 const database = require('./database/database');
 
 /**
@@ -22,6 +23,19 @@ class GrpcServer {
         this.protoLoader = new ProtoLoader();
         this.authService = new AuthService();
         this.taskService = new TaskService();
+        
+        // Métodos que requerem autenticação JWT
+        this.securedMethods = [
+            '/tasks.TaskService/CreateTask',
+            '/tasks.TaskService/GetTasks',
+            '/tasks.TaskService/GetTask',
+            '/tasks.TaskService/UpdateTask',
+            '/tasks.TaskService/DeleteTask',
+            '/tasks.TaskService/GetTaskStats',
+            '/tasks.TaskService/StreamTasks',
+            '/tasks.TaskService/StreamNotifications',
+            '/auth.AuthService/ValidateToken'
+        ];
     }
 
     async initialize() {
