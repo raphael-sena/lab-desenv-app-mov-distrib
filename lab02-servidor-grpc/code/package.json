@@ -10,7 +10,9 @@
     "test": "jest --verbose",
     "test:watch": "jest --watch",
     "proto:compile": "grpc_tools_node_protoc --js_out=import_style=commonjs,binary:./generated --grpc_out=grpc_js:./generated --plugin=protoc-gen-grpc=`which grpc_tools_node_protoc_plugin` -I ./protos ./protos/*.proto",
-    "benchmark": "node benchmark.js"
+    "benchmark": "node benchmark.js",
+    "start:multi": "node scripts/start-multi-servers.js",
+    "start:lb": "node load-balancer.js"
   },
   "keywords": ["grpc", "protocol-buffers", "sistemas-distribuidos", "streaming"],
   "author": "Raphael Sena Augusto de Brito - PUC Minas",
