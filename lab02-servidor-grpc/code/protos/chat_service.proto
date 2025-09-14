@@ -1,0 +1,36 @@
+syntax = "proto3";
+
+package chat;
+
+// Serviço de Chat em Tempo Real (Streaming Bidirecional)
+service ChatService {
+  // Canal bidirecional: cliente envia e recebe mensagens continuamente
+  rpc ChatStream(stream ChatMessage) returns (stream ChatMessage);
+  // Stream somente do servidor (ex: histórico ou notificações)
+  rpc Join(JoinRequest) returns (stream ChatMessage);
+}
+
+message JoinRequest {
+  string room = 1;
+  string user_id = 2;
+  string username = 3;
+  string token = 4; // opcional, pode vir via metadata também
+}
+
+message ChatMessage {
+  string id = 1;
+  string room = 2;
+  string user_id = 3;
+  string username = 4;
+  string content = 5;
+  int64 timestamp = 6;
+  MessageType type = 7; // SYSTEM, USER, JOIN, LEAVE
+}
+
+enum MessageType {
+  USER = 0;
+  SYSTEM = 1;
+  JOIN = 2;
+  LEAVE = 3;
+  ERROR = 4;
+}

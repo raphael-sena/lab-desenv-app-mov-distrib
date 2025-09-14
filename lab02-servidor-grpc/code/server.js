@@ -2,6 +2,7 @@ const grpc = require('@grpc/grpc-js');
 const ProtoLoader = require('./utils/protoLoader');
 const AuthService = require('./services/AuthService');
 const TaskService = require('./services/TaskService');
+const ChatService = require('./services/ChatService');
 const AuthInterceptor = require('./middleware/auth');
 const ErrorHandler = require('./middleware/errorHandler');
 const Logger = require('./middleware/logger');
@@ -25,6 +26,7 @@ class GrpcServer {
         this.protoLoader = new ProtoLoader();
         this.authService = new AuthService();
         this.taskService = new TaskService();
+    this.chatService = new ChatService();
         
         // Métodos que requerem autenticação JWT
         this.securedMethods = [
@@ -48,6 +50,7 @@ class GrpcServer {
             // Carregar definições dos protobuf
             const authProto = this.protoLoader.loadProto('auth_service.proto', 'auth');
             const taskProto = this.protoLoader.loadProto('task_service.proto', 'tasks');
+            const chatProto = this.protoLoader.loadProto('chat_service.proto', 'chat');
 
             // Aplicar interceptadores globais
             this.applyInterceptors();
@@ -71,8 +74,14 @@ class GrpcServer {
                 StreamNotifications: this.wrapWithAuth(this.taskService.streamNotifications.bind(this.taskService))
             });
 
+            // Registrar serviço de chat (streaming bidirecional)
+            this.server.addService(chatProto.ChatService.service, {
+                ChatStream: this.chatService.ChatStream.bind(this.chatService),
+                Join: this.chatService.Join.bind(this.chatService)
+            });
+
             Logger.info('Serviços gRPC registrados com sucesso', {
-                services: ['AuthService', 'TaskService'],
+                services: ['AuthService', 'TaskService', 'ChatService'],
                 securedMethods: this.securedMethods.length,
                 interceptors: 3
             });
@@ -193,6 +202,7 @@ class GrpcServer {
                 console.log('🚀 Serviços disponíveis:');
                 console.log('🚀   - AuthService (Register, Login, ValidateToken)');
                 console.log('🚀   - TaskService (CRUD + Streaming)');
+                console.log('🚀   - ChatService (ChatStream, Join)');
                 console.log('🚀 =================================');
             });
 
