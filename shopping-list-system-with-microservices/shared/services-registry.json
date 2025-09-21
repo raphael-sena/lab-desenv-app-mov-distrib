@@ -1,0 +1,48 @@
+{
+  "product-service": {
+    "url": "http://127.0.0.1:3002",
+    "version": "1.0.0",
+    "database": "JSON-NoSQL",
+    "endpoints": [
+      "/health",
+      "/products",
+      "/categories",
+      "/search"
+    ],
+    "registeredAt": 1758433418698,
+    "lastHealthCheck": 1758497944582,
+    "healthy": false,
+    "pid": 10324
+  },
+  "user-service": {
+    "url": "http://localhost:3001",
+    "version": "1.0.0",
+    "database": "JSON-NoSQL",
+    "endpoints": [
+      "/health",
+      "/auth/register",
+      "/auth/login",
+      "/users",
+      "/search"
+    ],
+    "registeredAt": 1758496304425,
+    "lastHealthCheck": 1758497944625,
+    "healthy": true,
+    "pid": 21868
+  },
+  "item-service": {
+    "url": "http://localhost:3003",
+    "version": "1.0.0",
+    "database": "JSON-NoSQL",
+    "endpoints": [
+      "/health",
+      "/items",
+      "/categories",
+      "/search"
+    ],
+    "registeredAt": 1758496498645,
+    "lastHealthCheck": 1758497944644,
+    "healthy": true,
+    "pid": 26272
+  }
+}

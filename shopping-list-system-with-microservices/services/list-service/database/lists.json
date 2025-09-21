@@ -1,0 +1,110 @@
+[
+  {
+    "id": "2ddd3225-41b3-4af7-b94d-15b52f2e8a3f",
+    "userId": "admin-user-id",
+    "name": "Lista de Compras Semanal",
+    "description": "Lista para compras semanais no supermercado",
+    "status": "active",
+    "items": [
+      {
+        "itemId": "item-001",
+        "itemName": "Leite Integral 1L",
+        "quantity": 2,
+        "unit": "unidade",
+        "estimatedPrice": 4.5,
+        "purchased": false,
+        "notes": "Preferir marca conhecida",
+        "addedAt": "2025-09-21T23:12:29.070Z"
+      },
+      {
+        "itemId": "item-002",
+        "itemName": "Pão de Forma",
+        "quantity": 1,
+        "unit": "pacote",
+        "estimatedPrice": 3.99,
+        "purchased": true,
+        "notes": "",
+        "addedAt": "2025-09-21T23:12:29.071Z"
+      }
+    ],
+    "summary": {
+      "totalItems": 2,
+      "purchasedItems": 1,
+      "estimatedTotal": 8.49
+    },
+    "createdAt": "2025-09-21T23:12:29.071Z",
+    "updatedAt": "2025-09-21T23:12:29.072Z"
+  },
+  {
+    "id": "22f27420-5fc8-42f8-b7c8-e9a3e61e1444",
+    "userId": "admin-user-id",
+    "name": "Lista de Materiais Escritório",
+    "description": "Materiais necessários para o escritório",
+    "status": "active",
+    "items": [
+      {
+        "itemId": "item-003",
+        "itemName": "Canetas Azuis",
+        "quantity": 12,
+        "unit": "unidade",
+        "estimatedPrice": 1.5,
+        "purchased": false,
+        "notes": "Bic cristal",
+        "addedAt": "2025-09-21T23:12:29.071Z"
+      },
+      {
+        "itemId": "item-004",
+        "itemName": "Resma Papel A4",
+        "quantity": 3,
+        "unit": "resma",
+        "estimatedPrice": 25.9,
+        "purchased": false,
+        "notes": "75g/m²",
+        "addedAt": "2025-09-21T23:12:29.071Z"
+      }
+    ],
+    "summary": {
+      "totalItems": 2,
+      "purchasedItems": 0,
+      "estimatedTotal": 95.7
+    },
+    "createdAt": "2025-09-21T23:12:29.071Z",
+    "updatedAt": "2025-09-21T23:12:29.092Z"
+  },
+  {
+    "id": "03a5cfa0-3abc-48f0-838e-54aa40797903",
+    "userId": "admin-user-id",
+    "name": "Lista de Compras Festa",
+    "description": "Itens para festa de aniversário",
+    "status": "completed",
+    "items": [
+      {
+        "itemId": "item-005",
+        "itemName": "Bolo de Chocolate",
+        "quantity": 1,
+        "unit": "unidade",
+        "estimatedPrice": 45,
+        "purchased": true,
+        "notes": "Encomendado na confeitaria",
+        "addedAt": "2025-09-21T23:12:29.071Z"
+      },
+      {
+        "itemId": "item-006",
+        "itemName": "Refrigerante 2L",
+        "quantity": 3,
+        "unit": "garrafa",
+        "estimatedPrice": 8.99,
+        "purchased": true,
+        "notes": "Coca-Cola, Guaraná, Sprite",
+        "addedAt": "2025-09-21T23:12:29.071Z"
+      }
+    ],
+    "summary": {
+      "totalItems": 2,
+      "purchasedItems": 2,
+      "estimatedTotal": 71.97
+    },
+    "createdAt": "2025-09-14T23:12:29.071Z",
+    "updatedAt": "2025-09-21T23:12:29.110Z"
+  }
+]
