@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:camera/camera.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as path;
 import '../screens/camera_screen.dart';
@@ -70,6 +71,35 @@ class CameraService {
       return null;
     } finally {
       controller.dispose();
+    }
+  }
+
+  Future<String?> pickFromGallery(BuildContext context) async {
+    try {
+      final picker = ImagePicker();
+      final picked = await picker.pickImage(
+        source: ImageSource.gallery,
+        maxWidth: 4096,
+        maxHeight: 4096,
+        imageQuality: 85,
+      );
+
+      if (picked == null) return null;
+
+      // A função savePicture aceita XFile; a ImagePicker já retorna XFile.
+      final savedPath = await savePicture(XFile(picked.path));
+      return savedPath;
+    } catch (e) {
+      print('❌ Erro ao selecionar foto da galeria: $e');
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erro ao selecionar foto: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+      return null;
     }
   }
 

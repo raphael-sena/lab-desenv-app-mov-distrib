@@ -52,6 +52,30 @@ class _CameraScreenState extends State<CameraScreen> {
     }
   }
 
+
+  Future<void> _chooseFromGallery() async {
+    if (_isCapturing) return;
+
+    setState(() => _isCapturing = true);
+
+    try {
+      final savedPath = await CameraService.instance.pickFromGallery(context);
+
+      if (savedPath != null && mounted) {
+        Navigator.pop(context, savedPath);
+      }
+    } catch (e) {
+      print('❌ Erro ao escolher da galeria: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Erro: $e'), backgroundColor: Colors.red),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isCapturing = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     if (!widget.controller.value.isInitialized) {
@@ -121,7 +145,10 @@ class _CameraScreenState extends State<CameraScreen> {
                       ),
                     ),
 
-                    const SizedBox(width: 48),
+                    IconButton(
+                      onPressed: _isCapturing ? null : _chooseFromGallery,
+                      icon: const Icon(Icons.photo_library, color: Colors.white, size: 32),
+                    ),
                   ],
                 ),
               ),
