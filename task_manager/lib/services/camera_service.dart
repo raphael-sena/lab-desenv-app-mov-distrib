@@ -86,8 +86,7 @@ class CameraService {
 
       if (picked == null) return null;
 
-      // A função savePicture aceita XFile; a ImagePicker já retorna XFile.
-      final savedPath = await savePicture(XFile(picked.path));
+      final savedPath = await savePicture(picked);
       return savedPath;
     } catch (e) {
       print('❌ Erro ao selecionar foto da galeria: $e');
@@ -95,6 +94,39 @@ class CameraService {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Erro ao selecionar foto: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+      return null;
+    }
+  }
+
+  // Novo: seleciona múltiplas imagens na galeria e salva cada uma
+  Future<List<String>?> pickMultipleFromGallery(BuildContext context) async {
+    try {
+      final picker = ImagePicker();
+      final pickedList = await picker.pickMultiImage(
+        maxWidth: 4096,
+        maxHeight: 4096,
+        imageQuality: 85,
+      );
+
+      if (pickedList == null || pickedList.isEmpty) return null;
+
+      final savedPaths = <String>[];
+      for (final xfile in pickedList) {
+        final saved = await savePicture(xfile);
+        savedPaths.add(saved);
+      }
+
+      return savedPaths;
+    } catch (e) {
+      print('❌ Erro ao selecionar fotos da galeria: $e');
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erro ao selecionar fotos: $e'),
             backgroundColor: Colors.red,
           ),
         );
@@ -134,6 +166,15 @@ class CameraService {
     } catch (e) {
       print('❌ Erro ao deletar foto: $e');
       return false;
+    }
+  }
+
+  // Novo: deletar várias fotos
+  Future<void> deletePhotos(List<String> paths) async {
+    for (final p in paths) {
+      try {
+        await deletePhoto(p);
+      } catch (_) {}
     }
   }
 }

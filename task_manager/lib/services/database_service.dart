@@ -1,46 +1,46 @@
 import 'dart:async';
-import 'package:path/path.dart';
+import 'dart:math';
+import 'package:path/path.dart' as p;
+import 'package:path_provider/path_provider.dart';
 import 'package:sqflite/sqflite.dart';
 import '../models/task.dart';
 
 class DatabaseService {
   static final DatabaseService instance = DatabaseService._init();
-  static Database? _database;
+  static Database? _db;
 
   DatabaseService._init();
 
   Future<Database> get database async {
-    if (_database != null) return _database!;
-    _database = await _initDB('tasks.db');
-    return _database!;
+    if (_db != null) return _db!;
+    _db = await _initDB('tasks.db');
+    return _db!;
   }
 
-  Future<Database> _initDB(String filePath) async {
-    final dbPath = await getDatabasesPath();
-    final path = join(dbPath, filePath);
+  Future<Database> _initDB(String fileName) async {
+    final docsDir = await getApplicationDocumentsDirectory();
+    final dbPath = p.join(docsDir.path, fileName);
+
+    // Versão inicial do DB (criação do zero)
+    const dbVersion = 1;
 
     return await openDatabase(
-      path,
-      version: 4,  // VERSÃO FINAL COM TODOS OS CAMPOS
-      onCreate: _createDB,
-      onUpgrade: _onUpgrade,
+      dbPath,
+      version: dbVersion,
+      onCreate: _onCreate,
     );
   }
 
-  Future<void> _createDB(Database db, int version) async {
-    const idType = 'INTEGER PRIMARY KEY AUTOINCREMENT';
-    const textType = 'TEXT NOT NULL';
-    const intType = 'INTEGER NOT NULL';
-
+  Future<void> _onCreate(Database db, int version) async {
     await db.execute('''
       CREATE TABLE tasks (
-        id $idType,
-        title $textType,
-        description $textType,
-        priority $textType,
-        completed $intType,
-        createdAt $textType,
-        photoPath TEXT,
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        title TEXT NOT NULL,
+        description TEXT NOT NULL,
+        priority TEXT NOT NULL,
+        completed INTEGER NOT NULL,
+        createdAt TEXT NOT NULL,
+        photoPaths TEXT,
         completedAt TEXT,
         completedBy TEXT,
         latitude REAL,
@@ -50,92 +50,54 @@ class DatabaseService {
     ''');
   }
 
-  Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
-    // Migração incremental para cada versão
-    if (oldVersion < 2) {
-      await db.execute('ALTER TABLE tasks ADD COLUMN photoPath TEXT');
+  Future<int> create(Map<String, dynamic> values) async {
+    final db = await database;
+    // Remover chave id se for nula para permitir AUTOINCREMENT
+    final insertValues = Map<String, dynamic>.from(values);
+    if (insertValues.containsKey('id') && insertValues['id'] == null) {
+      insertValues.remove('id');
     }
-    if (oldVersion < 3) {
-      await db.execute('ALTER TABLE tasks ADD COLUMN completedAt TEXT');
-      await db.execute('ALTER TABLE tasks ADD COLUMN completedBy TEXT');
-    }
-    if (oldVersion < 4) {
-      await db.execute('ALTER TABLE tasks ADD COLUMN latitude REAL');
-      await db.execute('ALTER TABLE tasks ADD COLUMN longitude REAL');
-      await db.execute('ALTER TABLE tasks ADD COLUMN locationName TEXT');
-    }
-    print('✅ Banco migrado de v$oldVersion para v$newVersion');
+    return await db.insert('tasks', insertValues);
   }
 
-  // CRUD Methods
-  Future<Task> create(Task task) async {
-    final db = await instance.database;
-    final id = await db.insert('tasks', task.toMap());
-    return task.copyWith(id: id);
-  }
-
-  Future<Task?> read(int id) async {
-    final db = await instance.database;
-    final maps = await db.query(
-      'tasks',
-      where: 'id = ?',
-      whereArgs: [id],
-    );
-
-    if (maps.isNotEmpty) {
-      return Task.fromMap(maps.first);
-    }
-    return null;
-  }
-
-  Future<List<Task>> readAll() async {
-    final db = await instance.database;
-    const orderBy = 'createdAt DESC';
-    final result = await db.query('tasks', orderBy: orderBy);
-    return result.map((json) => Task.fromMap(json)).toList();
-  }
-
-  Future<int> update(Task task) async {
-    final db = await instance.database;
-    return db.update(
-      'tasks',
-      task.toMap(),
-      where: 'id = ?',
-      whereArgs: [task.id],
-    );
+  Future<int> update(int id, Map<String, dynamic> values) async {
+    final db = await database;
+    final updateValues = Map<String, dynamic>.from(values);
+    updateValues.remove('id');
+    return await db.update('tasks', updateValues, where: 'id = ?', whereArgs: [id]);
   }
 
   Future<int> delete(int id) async {
-    final db = await instance.database;
-    return await db.delete(
-      'tasks',
-      where: 'id = ?',
-      whereArgs: [id],
-    );
+    final db = await database;
+    return await db.delete('tasks', where: 'id = ?', whereArgs: [id]);
   }
 
-  // Método especial: buscar tarefas por proximidade
+  Future<List<Task>> getAllTasks() async {
+    final db = await database;
+    final rows = await db.query('tasks', orderBy: 'createdAt DESC');
+    return rows.map((r) => Task.fromMap(r)).toList();
+  }
+
   Future<List<Task>> getTasksNearLocation({
     required double latitude,
     required double longitude,
-    double radiusInMeters = 1000,
+    required int radiusInMeters,
   }) async {
-    final allTasks = await readAll();
+    final db = await database;
+    final latDelta = radiusInMeters / 111320.0;
+    final lonDelta = radiusInMeters / (111320.0 * cos(latitude * (3.141592653589793 / 180)));
 
-    return allTasks.where((task) {
-      if (!task.hasLocation) return false;
+    final minLat = latitude - latDelta;
+    final maxLat = latitude + latDelta;
+    final minLon = longitude - lonDelta;
+    final maxLon = longitude + lonDelta;
 
-      // Cálculo de distância usando fórmula de Haversine (simplificada)
-      final latDiff = (task.latitude! - latitude).abs();
-      final lonDiff = (task.longitude! - longitude).abs();
-      final distance = ((latDiff * 111000) + (lonDiff * 111000)) / 2;
+    final rows = await db.query(
+      'tasks',
+      where: 'latitude BETWEEN ? AND ? AND longitude BETWEEN ? AND ?',
+      whereArgs: [minLat, maxLat, minLon, maxLon],
+    );
 
-      return distance <= radiusInMeters;
-    }).toList();
-  }
-
-  Future close() async {
-    final db = await instance.database;
-    db.close();
+    return rows.map((r) => Task.fromMap(r)).toList();
   }
 }

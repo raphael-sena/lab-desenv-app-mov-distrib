@@ -68,27 +68,28 @@ class _TaskListScreenState extends State<TaskListScreen> {
           children: [
             const Text('Selecione uma tarefa para completar:'),
             const SizedBox(height: 16),
-            ...pendingTasks.take(3).map((task) => ListTile(
-              contentPadding: EdgeInsets.zero,
-              title: Text(
-                task.title,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-              trailing: IconButton(
-                icon: const Icon(Icons.check_circle, color: Colors.green),
-                onPressed: () => _completeTaskByShake(task),
-              ),
-            )),
+            ...pendingTasks
+                .take(3)
+                .map(
+                  (task) => ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: Text(
+                      task.title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    trailing: IconButton(
+                      icon: const Icon(Icons.check_circle, color: Colors.green),
+                      onPressed: () => _completeTaskByShake(task),
+                    ),
+                  ),
+                ),
             if (pendingTasks.length > 3)
               Padding(
                 padding: const EdgeInsets.only(top: 8),
                 child: Text(
                   '+ ${pendingTasks.length - 3} outras',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: Colors.grey[600],
-                  ),
+                  style: TextStyle(fontSize: 12, color: Colors.grey[600]),
                 ),
               ),
           ],
@@ -111,7 +112,7 @@ class _TaskListScreenState extends State<TaskListScreen> {
         completedBy: 'shake',
       );
 
-      await DatabaseService.instance.update(updated);
+      await DatabaseService.instance.update(updated.id!, updated.toMap());
       Navigator.pop(context);
       await _loadTasks();
 
@@ -127,10 +128,7 @@ class _TaskListScreenState extends State<TaskListScreen> {
       Navigator.pop(context);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Erro: $e'),
-            backgroundColor: Colors.red,
-          ),
+          SnackBar(content: Text('Erro: $e'), backgroundColor: Colors.red),
         );
       }
     }
@@ -140,7 +138,8 @@ class _TaskListScreenState extends State<TaskListScreen> {
     setState(() => _isLoading = true);
 
     try {
-      final tasks = await DatabaseService.instance.readAll();
+      // Substitua por `readAll`, `getAll`, `readAllTasks` ou pelo método correto do seu DatabaseService
+      final tasks = await DatabaseService.instance.getAllTasks();
 
       if (mounted) {
         setState(() {
@@ -168,7 +167,7 @@ class _TaskListScreenState extends State<TaskListScreen> {
       case 'completed':
         return _tasks.where((t) => t.completed).toList();
       case 'nearby':
-      // Implementar filtro de proximidade
+        // Implementar filtro de proximidade
         return _tasks;
       default:
         return _tasks;
@@ -245,32 +244,31 @@ class _TaskListScreenState extends State<TaskListScreen> {
       ),
     );
 
-    if (confirm == true) {
-      try {
-        if (task.hasPhoto) {
-          await CameraService.instance.deletePhoto(task.photoPath!);
-        }
+    if (confirm != true) return;
 
-        await DatabaseService.instance.delete(task.id!);
-        await _loadTasks();
+    try {
+      if (task.hasPhoto &&
+          task.photoPaths != null &&
+          task.photoPaths!.isNotEmpty) {
+        await CameraService.instance.deletePhotos(task.photoPaths!);
+      }
 
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('🗑️ Tarefa deletada'),
-              duration: Duration(seconds: 2),
-            ),
-          );
-        }
-      } catch (e) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Erro: $e'),
-              backgroundColor: Colors.red,
-            ),
-          );
-        }
+      await DatabaseService.instance.delete(task.id!);
+      await _loadTasks();
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('🗑️ Tarefa deletada'),
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Erro: $e'), backgroundColor: Colors.red),
+        );
       }
     }
   }
@@ -283,15 +281,12 @@ class _TaskListScreenState extends State<TaskListScreen> {
         completedBy: !task.completed ? 'manual' : null,
       );
 
-      await DatabaseService.instance.update(updated);
+      await DatabaseService.instance.update(updated.id!, updated.toMap());
       await _loadTasks();
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Erro: $e'),
-            backgroundColor: Colors.red,
-          ),
+          SnackBar(content: Text('Erro: $e'), backgroundColor: Colors.red),
         );
       }
     }
@@ -402,92 +397,92 @@ class _TaskListScreenState extends State<TaskListScreen> {
         child: _isLoading
             ? const Center(child: CircularProgressIndicator())
             : Column(
-          children: [
-            // CARD DE ESTATÍSTICAS
-            Container(
-              margin: const EdgeInsets.all(16),
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [Colors.blue.shade400, Colors.blue.shade700],
-                ),
-                borderRadius: BorderRadius.circular(16),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.blue.withOpacity(0.3),
-                    blurRadius: 8,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceAround,
                 children: [
-                  _StatItem(
-                    label: 'Total',
-                    value: stats['total'].toString(),
-                    icon: Icons.list_alt,
-                  ),
+                  // CARD DE ESTATÍSTICAS
                   Container(
-                    width: 1,
-                    height: 40,
-                    color: Colors.white.withOpacity(0.3),
+                    margin: const EdgeInsets.all(16),
+                    padding: const EdgeInsets.all(20),
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [Colors.blue.shade400, Colors.blue.shade700],
+                      ),
+                      borderRadius: BorderRadius.circular(16),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.blue.withOpacity(0.3),
+                          blurRadius: 8,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceAround,
+                      children: [
+                        _StatItem(
+                          label: 'Total',
+                          value: stats['total'].toString(),
+                          icon: Icons.list_alt,
+                        ),
+                        Container(
+                          width: 1,
+                          height: 40,
+                          color: Colors.white.withOpacity(0.3),
+                        ),
+                        _StatItem(
+                          label: 'Concluídas',
+                          value: stats['completed'].toString(),
+                          icon: Icons.check_circle,
+                        ),
+                        Container(
+                          width: 1,
+                          height: 40,
+                          color: Colors.white.withOpacity(0.3),
+                        ),
+                        _StatItem(
+                          label: 'Taxa',
+                          value: '${stats['completionRate']}%',
+                          icon: Icons.trending_up,
+                        ),
+                      ],
+                    ),
                   ),
-                  _StatItem(
-                    label: 'Concluídas',
-                    value: stats['completed'].toString(),
-                    icon: Icons.check_circle,
-                  ),
-                  Container(
-                    width: 1,
-                    height: 40,
-                    color: Colors.white.withOpacity(0.3),
-                  ),
-                  _StatItem(
-                    label: 'Taxa',
-                    value: '${stats['completionRate']}%',
-                    icon: Icons.trending_up,
+
+                  // LISTA DE TAREFAS
+                  Expanded(
+                    child: filteredTasks.isEmpty
+                        ? _buildEmptyState()
+                        : ListView.builder(
+                            padding: const EdgeInsets.symmetric(horizontal: 16),
+                            itemCount: filteredTasks.length,
+                            itemBuilder: (context, index) {
+                              final task = filteredTasks[index];
+                              return TaskCard(
+                                task: task,
+                                onTap: () async {
+                                  final result = await Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (context) =>
+                                          TaskFormScreen(task: task),
+                                    ),
+                                  );
+                                  if (result == true) _loadTasks();
+                                },
+                                onDelete: () => _deleteTask(task),
+                                onCheckboxChanged: (value) =>
+                                    _toggleComplete(task),
+                              );
+                            },
+                          ),
                   ),
                 ],
               ),
-            ),
-
-            // LISTA DE TAREFAS
-            Expanded(
-              child: filteredTasks.isEmpty
-                  ? _buildEmptyState()
-                  : ListView.builder(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                itemCount: filteredTasks.length,
-                itemBuilder: (context, index) {
-                  final task = filteredTasks[index];
-                  return TaskCard(
-                    task: task,
-                    onTap: () async {
-                      final result = await Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => TaskFormScreen(task: task),
-                        ),
-                      );
-                      if (result == true) _loadTasks();
-                    },
-                    onDelete: () => _deleteTask(task),
-                    onCheckboxChanged: (value) => _toggleComplete(task),
-                  );
-                },
-              ),
-            ),
-          ],
-        ),
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () async {
           final result = await Navigator.push(
             context,
-            MaterialPageRoute(
-              builder: (context) => const TaskFormScreen(),
-            ),
+            MaterialPageRoute(builder: (context) => const TaskFormScreen()),
           );
           if (result == true) _loadTasks();
         },
@@ -530,10 +525,7 @@ class _TaskListScreenState extends State<TaskListScreen> {
           Text(
             message,
             textAlign: TextAlign.center,
-            style: TextStyle(
-              fontSize: 16,
-              color: Colors.grey[600],
-            ),
+            style: TextStyle(fontSize: 16, color: Colors.grey[600]),
           ),
         ],
       ),
@@ -568,10 +560,7 @@ class _StatItem extends StatelessWidget {
         ),
         Text(
           label,
-          style: TextStyle(
-            color: Colors.white.withOpacity(0.9),
-            fontSize: 12,
-          ),
+          style: TextStyle(color: Colors.white.withOpacity(0.9), fontSize: 12),
         ),
       ],
     );

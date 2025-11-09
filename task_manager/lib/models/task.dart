@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 class Task {
   final int? id;
   final String title;
@@ -7,7 +9,7 @@ class Task {
   final DateTime createdAt;
 
   // CÂMERA
-  final String? photoPath;
+  final List<String>? photoPaths;
 
   // SENSORES
   final DateTime? completedAt;
@@ -25,7 +27,7 @@ class Task {
     required this.priority,
     this.completed = false,
     DateTime? createdAt,
-    this.photoPath,
+    this.photoPaths,
     this.completedAt,
     this.completedBy,
     this.latitude,
@@ -34,7 +36,7 @@ class Task {
   }) : createdAt = createdAt ?? DateTime.now();
 
   // Getters auxiliares
-  bool get hasPhoto => photoPath != null && photoPath!.isNotEmpty;
+  bool get hasPhoto => photoPaths != null && photoPaths!.isNotEmpty;
   bool get hasLocation => latitude != null && longitude != null;
   bool get wasCompletedByShake => completedBy == 'shake';
 
@@ -46,7 +48,7 @@ class Task {
       'priority': priority,
       'completed': completed ? 1 : 0,
       'createdAt': createdAt.toIso8601String(),
-      'photoPath': photoPath,
+      'photoPaths': jsonEncode(photoPaths ?? []),
       'completedAt': completedAt?.toIso8601String(),
       'completedBy': completedBy,
       'latitude': latitude,
@@ -56,6 +58,18 @@ class Task {
   }
 
   factory Task.fromMap(Map<String, dynamic> map) {
+    final photoPathsString = map['photoPaths'] as String?;
+    List<String>? parsedPhotoPaths;
+    if (photoPathsString != null && photoPathsString.isNotEmpty) {
+      try {
+        parsedPhotoPaths = List<String>.from(jsonDecode(photoPathsString) as List);
+      } catch (_) {
+        parsedPhotoPaths = null;
+      }
+    } else {
+      parsedPhotoPaths = null;
+    }
+
     return Task(
       id: map['id'] as int?,
       title: map['title'] as String,
@@ -63,7 +77,7 @@ class Task {
       priority: map['priority'] as String,
       completed: (map['completed'] as int) == 1,
       createdAt: DateTime.parse(map['createdAt'] as String),
-      photoPath: map['photoPath'] as String?,
+      photoPaths: parsedPhotoPaths,
       completedAt: map['completedAt'] != null
           ? DateTime.parse(map['completedAt'] as String)
           : null,
@@ -81,7 +95,7 @@ class Task {
     String? priority,
     bool? completed,
     DateTime? createdAt,
-    String? photoPath,
+    List<String>? photoPaths,
     DateTime? completedAt,
     String? completedBy,
     double? latitude,
@@ -95,7 +109,7 @@ class Task {
       priority: priority ?? this.priority,
       completed: completed ?? this.completed,
       createdAt: createdAt ?? this.createdAt,
-      photoPath: photoPath ?? this.photoPath,
+      photoPaths: photoPaths ?? this.photoPaths,
       completedAt: completedAt ?? this.completedAt,
       completedBy: completedBy ?? this.completedBy,
       latitude: latitude ?? this.latitude,

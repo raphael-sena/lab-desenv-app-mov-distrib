@@ -10,7 +10,7 @@ class SensorService {
   StreamSubscription<AccelerometerEvent>? _accelerometerSubscription;
   Function()? _onShake;
 
-  static const double _shakeThreshold = 15.0;
+  static const double _shakeThreshold = 18.0;
   static const Duration _shakeCooldown = Duration(milliseconds: 500);
 
   DateTime? _lastShakeTime;
