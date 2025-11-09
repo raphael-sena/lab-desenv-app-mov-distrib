@@ -44,6 +44,13 @@ dependencies:
   uuid: ^4.2.1
   intl: ^0.20.2
 
+  camera: ^0.11.3                # Câmera
+  permission_handler: ^12.0.1    # Gerenciamento de permissões
+  sensors_plus: ^7.0.0           # Sensores (acelerômetro)
+  vibration: ^3.1.4              # Feedback tátil
+  geolocator: ^14.0.2            # GPS
+  geocoding: ^2.1.1              # Endereços
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
