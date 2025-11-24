@@ -1,0 +1,50 @@
+# Node modules
+node_modules/
+npm-debug.log
+yarn-error.log
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# Database files (opcional - comentar se quiser versioná-los)
+# services/*/database/*.json
+# services/*/database/*_index.json
+
+# Logs
+logs/
+*.log
+*.log.*
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# Build outputs
+dist/
+build/
+
+# RabbitMQ data (se estiver usando docker)
+rabbitmq-data/
+
+# Coverage
+coverage/
+.nyc_output/
+
+# Lock files (opcional)
+# package-lock.json
+# yarn.lock

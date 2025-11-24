@@ -1,0 +1,108 @@
+### Variáveis
+@baseUrl = http://localhost:3002
+@userServiceUrl = http://localhost:3001
+@token = 
+
+### 1. LOGIN - Obter Token
+# @name login
+POST {{userServiceUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "admin@example.com",
+  "password": "admin123"
+}
+
+### 2. CRIAR LISTA DE COMPRAS
+# @name createList
+POST {{baseUrl}}/lists
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "name": "Lista de Teste RabbitMQ - {{$datetime}}",
+  "description": "Lista criada para testar o sistema de mensageria assíncrona",
+  "items": [
+    {
+      "itemId": "item-notebook-001",
+      "itemName": "Notebook Dell Inspiron 15",
+      "quantity": 1,
+      "unit": "unidade",
+      "estimatedPrice": 3500.00,
+      "purchased": false,
+      "notes": "Intel i5, 8GB RAM, 256GB SSD"
+    },
+    {
+      "itemId": "item-mouse-001",
+      "itemName": "Mouse Logitech MX Master 3",
+      "quantity": 2,
+      "unit": "unidade",
+      "estimatedPrice": 450.00,
+      "purchased": false,
+      "notes": "Wireless, USB-C"
+    },
+    {
+      "itemId": "item-teclado-001",
+      "itemName": "Teclado Mecânico Keychron K2",
+      "quantity": 1,
+      "unit": "unidade",
+      "estimatedPrice": 650.00,
+      "purchased": false,
+      "notes": "Switch Brown, RGB, Bluetooth"
+    },
+    {
+      "itemId": "item-monitor-001",
+      "itemName": "Monitor LG 27 UltraWide",
+      "quantity": 1,
+      "unit": "unidade",
+      "estimatedPrice": 1800.00,
+      "purchased": false,
+      "notes": "IPS, QHD, 75Hz"
+    }
+  ]
+}
+
+### 3. CHECKOUT - DISPARA RABBITMQ 🚀
+# Substituir LIST_ID pelo ID retornado na requisição anterior
+# @name checkout
+POST {{baseUrl}}/lists/LIST_ID/checkout
+Authorization: Bearer {{token}}
+
+### 4. LISTAR TODAS AS LISTAS
+GET {{baseUrl}}/lists
+Authorization: Bearer {{token}}
+
+### 5. BUSCAR LISTA ESPECÍFICA
+GET {{baseUrl}}/lists/LIST_ID
+Authorization: Bearer {{token}}
+
+### 6. HEALTH CHECK - List Service
+GET {{baseUrl}}/health
+
+### 7. HEALTH CHECK - User Service
+GET {{userServiceUrl}}/health
+
+### 8. CRIAR LISTA SIMPLES (Teste Rápido)
+POST {{baseUrl}}/lists
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "name": "Lista Rápida",
+  "description": "Teste rápido",
+  "items": [
+    {
+      "itemId": "quick-001",
+      "itemName": "Produto Teste",
+      "quantity": 1,
+      "estimatedPrice": 99.90
+    }
+  ]
+}
+
+### 9. CHECKOUT RÁPIDO
+# Substituir LIST_ID
+POST {{baseUrl}}/lists/LIST_ID/checkout
+Authorization: Bearer {{token}}
+
+###

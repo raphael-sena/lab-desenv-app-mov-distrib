@@ -293,6 +293,8 @@ class UserService {
         try {
             const { identifier, password } = req.body;
 
+            console.log('🔐 Login attempt:', { identifier, password: '***' });
+
             if (!identifier || !password) {
                 return res.status(400).json({
                     success: false,
@@ -306,6 +308,13 @@ class UserService {
                     { username: identifier.toLowerCase() }
                 ]
             });
+
+            console.log('👤 User found:', user ? `${user.email} (${user.username})` : 'null');
+            
+            if (user) {
+                const passwordMatch = await bcrypt.compare(password, user.password);
+                console.log('🔑 Password match:', passwordMatch);
+            }
 
             if (!user || !await bcrypt.compare(password, user.password)) {
                 return res.status(401).json({

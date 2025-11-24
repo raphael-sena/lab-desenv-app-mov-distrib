@@ -5,6 +5,7 @@ const morgan = require('morgan');
 const { v4: uuidv4 } = require('uuid');
 const path = require('path');
 const axios = require('axios');
+const amqp = require('amqplib');
 
 // Importar banco NoSQL e service registry
 const JsonDatabase = require('../../shared/JsonDatabase');
@@ -16,8 +17,12 @@ class ListService {
         this.port = process.env.PORT || 3002;
         this.serviceName = 'list-service';
         this.serviceUrl = `http://127.0.0.1:${this.port}`;
+        this.rabbitMQUrl = process.env.RABBITMQ_URL || 'amqp://localhost';
+        this.rabbitConnection = null;
+        this.rabbitChannel = null;
         
         this.setupDatabase();
+        this.setupRabbitMQ();
         this.setupMiddleware();
         this.setupRoutes();
         this.setupErrorHandling();
@@ -28,6 +33,56 @@ class ListService {
         const dbPath = path.join(__dirname, 'database');
         this.listsDb = new JsonDatabase(dbPath, 'lists');
         console.log('List Service: Banco NoSQL inicializado');
+    }
+
+    async setupRabbitMQ() {
+        try {
+            this.rabbitConnection = await amqp.connect(this.rabbitMQUrl);
+            this.rabbitChannel = await this.rabbitConnection.createChannel();
+            
+            // Criar exchange do tipo topic
+            await this.rabbitChannel.assertExchange('shopping_events', 'topic', {
+                durable: true
+            });
+            
+            console.log('✅ List Service: RabbitMQ conectado - Exchange "shopping_events" criado');
+            
+            // Listener para reconexão
+            this.rabbitConnection.on('error', (err) => {
+                console.error('❌ RabbitMQ connection error:', err);
+            });
+            
+            this.rabbitConnection.on('close', () => {
+                console.log('⚠️  RabbitMQ connection closed. Reconnecting in 5s...');
+                setTimeout(() => this.setupRabbitMQ(), 5000);
+            });
+        } catch (error) {
+            console.error('❌ Erro ao conectar RabbitMQ:', error.message);
+            console.log('⚠️  Tentando reconectar em 5s...');
+            setTimeout(() => this.setupRabbitMQ(), 5000);
+        }
+    }
+
+    async publishEvent(routingKey, message) {
+        try {
+            if (!this.rabbitChannel) {
+                throw new Error('Canal RabbitMQ não disponível');
+            }
+            
+            const messageBuffer = Buffer.from(JSON.stringify(message));
+            this.rabbitChannel.publish(
+                'shopping_events',
+                routingKey,
+                messageBuffer,
+                { persistent: true }
+            );
+            
+            console.log(`📤 Evento publicado: ${routingKey}`);
+            return true;
+        } catch (error) {
+            console.error('❌ Erro ao publicar evento:', error);
+            return false;
+        }
     }
 
     async seedInitialData() {
@@ -220,7 +275,8 @@ class ListService {
                     'POST /lists/:id/items - Adicionar item à lista',
                     'PUT /lists/:id/items/:itemId - Atualizar item da lista',
                     'DELETE /lists/:id/items/:itemId - Remover item da lista',
-                    'GET /lists/:id/summary - Resumo da lista'
+                    'GET /lists/:id/summary - Resumo da lista',
+                    'POST /lists/:id/checkout - Finalizar compra (publica evento)'
                 ]
             });
         });
@@ -239,6 +295,9 @@ class ListService {
 
         // Summary route
         this.app.get('/lists/:id/summary', this.authMiddleware.bind(this), this.getListSummary.bind(this));
+
+        // Checkout route (RabbitMQ)
+        this.app.post('/lists/:id/checkout', this.authMiddleware.bind(this), this.checkoutList.bind(this));
 
         // Search route
         this.app.get('/search', this.authMiddleware.bind(this), this.searchLists.bind(this));
@@ -853,6 +912,89 @@ class ListService {
             });
         } catch (error) {
             console.error('Erro na busca de listas:', error);
+            res.status(500).json({
+                success: false,
+                message: 'Erro interno do servidor'
+            });
+        }
+    }
+
+    // Checkout list (RabbitMQ Producer)
+    async checkoutList(req, res) {
+        try {
+            const { id } = req.params;
+
+            const list = await this.listsDb.findById(id);
+            if (!list) {
+                return res.status(404).json({
+                    success: false,
+                    message: 'Lista não encontrada'
+                });
+            }
+
+            // Verificar permissão
+            if (list.userId !== req.user.id) {
+                return res.status(403).json({
+                    success: false,
+                    message: 'Acesso negado'
+                });
+            }
+
+            // Calcular total da lista
+            const totalAmount = list.items.reduce((sum, item) => {
+                return sum + (item.estimatedPrice || 0) * (item.quantity || 1);
+            }, 0);
+
+            // Preparar mensagem para RabbitMQ
+            const checkoutEvent = {
+                eventType: 'list.checkout.completed',
+                timestamp: new Date().toISOString(),
+                data: {
+                    listId: id,
+                    listName: list.name,
+                    userId: req.user.id,
+                    userEmail: req.user.email,
+                    totalItems: list.items.length,
+                    totalAmount: totalAmount.toFixed(2),
+                    items: list.items.map(item => ({
+                        itemId: item.itemId,
+                        itemName: item.itemName,
+                        quantity: item.quantity,
+                        estimatedPrice: item.estimatedPrice
+                    }))
+                }
+            };
+
+            // Publicar evento no RabbitMQ
+            const published = await this.publishEvent('list.checkout.completed', checkoutEvent);
+
+            if (!published) {
+                return res.status(503).json({
+                    success: false,
+                    message: 'Erro ao publicar evento de checkout'
+                });
+            }
+
+            // Atualizar status da lista
+            await this.listsDb.update(id, { 
+                status: 'completed',
+                completedAt: new Date().toISOString()
+            });
+
+            // Retornar 202 Accepted imediatamente
+            res.status(202).json({
+                success: true,
+                message: 'Checkout iniciado - processamento assíncrono em andamento',
+                data: {
+                    listId: id,
+                    totalAmount: totalAmount.toFixed(2),
+                    status: 'processing'
+                }
+            });
+
+            console.log(`✅ Checkout processado para lista ${id} - Evento publicado`);
+        } catch (error) {
+            console.error('Erro no checkout da lista:', error);
             res.status(500).json({
                 success: false,
                 message: 'Erro interno do servidor'

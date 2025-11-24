@@ -1,0 +1,26 @@
+{
+  "name": "rabbitmq-consumers",
+  "version": "1.0.0",
+  "description": "RabbitMQ Consumers para processamento assíncrono de eventos de checkout",
+  "main": "consumers/notification-consumer.js",
+  "scripts": {
+    "notification": "node consumers/notification-consumer.js",
+    "analytics": "node consumers/analytics-consumer.js",
+    "start": "concurrently \"npm run notification\" \"npm run analytics\""
+  },
+  "keywords": [
+    "rabbitmq",
+    "amqp",
+    "messaging",
+    "consumers",
+    "async"
+  ],
+  "author": "PUC Minas",
+  "license": "MIT",
+  "dependencies": {
+    "amqplib": "^0.10.3"
+  },
+  "devDependencies": {
+    "concurrently": "^7.6.0"
+  }
+}

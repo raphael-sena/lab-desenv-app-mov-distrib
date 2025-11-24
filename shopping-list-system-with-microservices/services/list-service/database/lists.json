@@ -106,5 +106,21 @@
     },
     "createdAt": "2025-09-14T23:12:29.071Z",
     "updatedAt": "2025-09-21T23:12:29.110Z"
+  },
+  {
+    "id": "c15dc57c-2441-415c-8b54-9bbb67f9cbaf",
+    "userId": "6581076d-fb42-441e-8e5d-69690aa6fe05",
+    "name": "Lista de Teste RabbitMQ 21:06:51",
+    "description": "Lista criada automaticamente para testar mensageria",
+    "status": "completed",
+    "items": [],
+    "summary": {
+      "totalItems": 0,
+      "purchasedItems": 0,
+      "estimatedTotal": 0
+    },
+    "createdAt": "2025-11-24T00:06:52.380Z",
+    "updatedAt": "2025-11-24T00:06:54.409Z",
+    "completedAt": "2025-11-24T00:06:54.408Z"
   }
 ]

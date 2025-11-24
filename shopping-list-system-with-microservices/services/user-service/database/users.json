@@ -9,7 +9,9 @@
     "role": "admin",
     "status": "active",
     "createdAt": "2025-09-21T05:25:53.668Z",
-    "updatedAt": "2025-09-21T05:25:53.669Z"
+    "updatedAt": "2025-11-24T00:06:51.962Z",
+    "metadata.lastLogin": "2025-11-24T00:06:51.962Z",
+    "metadata.loginCount": 1
   },
   {
     "id": "48805fda-fbda-4958-8b39-ec8a17519144",
@@ -151,5 +153,34 @@
     },
     "createdAt": "2025-09-21T23:35:58.628Z",
     "updatedAt": "2025-09-21T23:35:58.628Z"
+  },
+  {
+    "id": "ec416074-70df-457e-9654-1c84521ef865",
+    "email": "teste@test.com",
+    "username": "teste",
+    "password": "$2a$12$ataUU4bWsvr3.zIFS7P4qeLw0l2bRWvi2Iw8wyekuSJf53nMC86ye",
+    "firstName": "Teste",
+    "lastName": "Usuario",
+    "role": "user",
+    "status": "active",
+    "profile": {
+      "bio": null,
+      "avatar": null,
+      "preferences": {
+        "theme": "light",
+        "language": "pt-BR"
+      }
+    },
+    "metadata": {
+      "registrationDate": "2025-11-24T00:02:25.409Z",
+      "lastLogin": null,
+      "loginCount": 0
+    },
+    "preferences": {
+      "defaultStore": null,
+      "currency": "BRL"
+    },
+    "createdAt": "2025-11-24T00:02:25.410Z",
+    "updatedAt": "2025-11-24T00:02:25.410Z"
   }
 ]

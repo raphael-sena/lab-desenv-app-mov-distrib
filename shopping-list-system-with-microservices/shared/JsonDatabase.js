@@ -229,6 +229,16 @@ class JsonDatabase {
     }
 
     matchesFilter(document, filter) {
+        // Suporte ao operador $or
+        if (filter.$or) {
+            return filter.$or.some(condition => this.matchesFilter(document, condition));
+        }
+
+        // Suporte ao operador $and
+        if (filter.$and) {
+            return filter.$and.every(condition => this.matchesFilter(document, condition));
+        }
+
         return Object.entries(filter).every(([key, value]) => {
             const docValue = this.getNestedValue(document, key);
 
