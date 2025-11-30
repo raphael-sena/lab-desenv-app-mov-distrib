@@ -4,6 +4,7 @@ import '../models/task.dart';
 import '../services/database_service.dart';
 import '../services/camera_service.dart';
 import '../services/location_service.dart';
+import '../services/sync_service.dart';
 import '../widgets/location_picker.dart';
 
 class TaskFormScreen extends StatefulWidget {
@@ -174,7 +175,14 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
         );
 
         // enviar Map<String, dynamic> para o DatabaseService
-        await DatabaseService.instance.create(newTask.toMap());
+        final taskId = await DatabaseService.instance.create(newTask.toMap());
+        
+        // Adicionar à fila de sincronização
+        await SyncService.instance.queueOperation(
+          taskId: taskId,
+          operation: 'CREATE',
+          task: newTask.copyWith(id: taskId),
+        );
 
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -199,6 +207,13 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
 
         // update espera (int id, Map<String, dynamic>)
         await DatabaseService.instance.update(updatedTask.id!, updatedTask.toMap());
+        
+        // Adicionar à fila de sincronização
+        await SyncService.instance.queueOperation(
+          taskId: updatedTask.id!,
+          operation: 'UPDATE',
+          task: updatedTask,
+        );
 
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(

@@ -2,12 +2,20 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:task_manager/screens/task_list_screen.dart';
 import 'package:task_manager/services/camera_service.dart';
+import 'package:task_manager/services/connectivity_service.dart';
+import 'package:task_manager/services/sync_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   // Inicializar câmera
   await CameraService.instance.initialize();
+
+  // Inicializar serviço de conectividade
+  await ConnectivityService.instance.initialize();
+
+  // Inicializar serviço de sincronização
+  await SyncService.instance.initialize();
 
   runApp(const MyApp());
 }

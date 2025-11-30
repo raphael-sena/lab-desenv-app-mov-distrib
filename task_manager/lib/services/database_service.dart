@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:math';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
@@ -21,13 +22,14 @@ class DatabaseService {
     final docsDir = await getApplicationDocumentsDirectory();
     final dbPath = p.join(docsDir.path, fileName);
 
-    // Versão inicial do DB (criação do zero)
-    const dbVersion = 1;
+    // Versão atualizada para suportar offline-first
+    const dbVersion = 2;
 
     return await openDatabase(
       dbPath,
       version: dbVersion,
       onCreate: _onCreate,
+      onUpgrade: _onUpgrade,
     );
   }
 
@@ -40,6 +42,8 @@ class DatabaseService {
         priority TEXT NOT NULL,
         completed INTEGER NOT NULL,
         createdAt TEXT NOT NULL,
+        updatedAt TEXT NOT NULL,
+        isSynced INTEGER NOT NULL DEFAULT 0,
         photoPaths TEXT,
         completedAt TEXT,
         completedBy TEXT,
@@ -48,6 +52,41 @@ class DatabaseService {
         locationName TEXT
       )
     ''');
+
+    // Tabela de fila de sincronização
+    await db.execute('''
+      CREATE TABLE sync_queue (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        taskId INTEGER NOT NULL,
+        operation TEXT NOT NULL,
+        taskData TEXT NOT NULL,
+        createdAt TEXT NOT NULL,
+        synced INTEGER NOT NULL DEFAULT 0
+      )
+    ''');
+  }
+
+  Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
+    if (oldVersion < 2) {
+      // Adicionar novas colunas à tabela tasks
+      await db.execute('ALTER TABLE tasks ADD COLUMN updatedAt TEXT');
+      await db.execute('ALTER TABLE tasks ADD COLUMN isSynced INTEGER NOT NULL DEFAULT 0');
+      
+      // Atualizar updatedAt para tasks existentes
+      await db.execute('UPDATE tasks SET updatedAt = createdAt WHERE updatedAt IS NULL');
+
+      // Criar tabela sync_queue
+      await db.execute('''
+        CREATE TABLE sync_queue (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          taskId INTEGER NOT NULL,
+          operation TEXT NOT NULL,
+          taskData TEXT NOT NULL,
+          createdAt TEXT NOT NULL,
+          synced INTEGER NOT NULL DEFAULT 0
+        )
+      ''');
+    }
   }
 
   Future<int> create(Map<String, dynamic> values) async {
@@ -99,5 +138,77 @@ class DatabaseService {
     );
 
     return rows.map((r) => Task.fromMap(r)).toList();
+  }
+
+  // ========== SYNC QUEUE METHODS ==========
+
+  Future<int> addToSyncQueue({
+    required int taskId,
+    required String operation,
+    required Map<String, dynamic> taskData,
+  }) async {
+    final db = await database;
+    return await db.insert('sync_queue', {
+      'taskId': taskId,
+      'operation': operation, // 'CREATE', 'UPDATE', 'DELETE'
+      'taskData': jsonEncode(taskData),
+      'createdAt': DateTime.now().toIso8601String(),
+      'synced': 0,
+    });
+  }
+
+  Future<List<Map<String, dynamic>>> getPendingSyncItems() async {
+    final db = await database;
+    final rows = await db.query(
+      'sync_queue',
+      where: 'synced = ?',
+      whereArgs: [0],
+      orderBy: 'createdAt ASC',
+    );
+    
+    return rows.map((row) {
+      return {
+        'id': row['id'],
+        'taskId': row['taskId'],
+        'operation': row['operation'],
+        'taskData': jsonDecode(row['taskData'] as String),
+        'createdAt': row['createdAt'],
+      };
+    }).toList();
+  }
+
+  Future<void> markSyncItemAsSynced(int syncQueueId) async {
+    final db = await database;
+    await db.update(
+      'sync_queue',
+      {'synced': 1},
+      where: 'id = ?',
+      whereArgs: [syncQueueId],
+    );
+  }
+
+  Future<void> deleteSyncItem(int syncQueueId) async {
+    final db = await database;
+    await db.delete('sync_queue', where: 'id = ?', whereArgs: [syncQueueId]);
+  }
+
+  Future<void> markTaskAsSynced(int taskId) async {
+    final db = await database;
+    await db.update(
+      'tasks',
+      {'isSynced': 1},
+      where: 'id = ?',
+      whereArgs: [taskId],
+    );
+  }
+
+  Future<void> markTaskAsUnsynced(int taskId) async {
+    final db = await database;
+    await db.update(
+      'tasks',
+      {'isSynced': 0},
+      where: 'id = ?',
+      whereArgs: [taskId],
+    );
   }
 }

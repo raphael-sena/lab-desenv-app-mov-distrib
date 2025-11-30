@@ -4,8 +4,11 @@ import '../services/camera_service.dart';
 import '../services/database_service.dart';
 import '../services/sensor_service.dart';
 import '../services/location_service.dart';
+import '../services/connectivity_service.dart';
+import '../services/sync_service.dart';
 import '../screens/task_form_screen.dart';
 import '../widgets/task_card.dart';
+import 'dart:async';
 
 class TaskListScreen extends StatefulWidget {
   const TaskListScreen({super.key});
@@ -18,18 +21,97 @@ class _TaskListScreenState extends State<TaskListScreen> {
   List<Task> _tasks = [];
   String _filter = 'all';
   bool _isLoading = true;
+  bool _isOnline = false;
+  int _pendingSyncCount = 0;
+  bool _isSyncing = false;
+  StreamSubscription<bool>? _connectivitySubscription;
 
   @override
   void initState() {
     super.initState();
     _loadTasks();
     _setupShakeDetection(); // INICIAR SHAKE
+    _setupConnectivityListener(); // INICIAR LISTENER DE CONECTIVIDADE
+    _updateOnlineStatus();
+    _updatePendingSyncCount();
+    _initialSync(); // SINCRONIZAÇÃO INICIAL
+  }
+
+  // Sincronização inicial ao abrir o app
+  Future<void> _initialSync() async {
+    // Aguardar um pouco para garantir que a conectividade foi verificada
+    await Future.delayed(const Duration(milliseconds: 500));
+    
+    if (ConnectivityService.instance.isOnline) {
+      try {
+        print('===== INICIANDO SINCRONIZAÇÃO AUTOMÁTICA =====');
+        setState(() => _isSyncing = true);
+        
+        await SyncService.instance.syncPendingChanges();
+        await _loadTasks();
+        _updatePendingSyncCount();
+        
+        print('===== SINCRONIZAÇÃO AUTOMÁTICA CONCLUÍDA =====');
+      } catch (e) {
+        print('Erro na sincronização inicial: $e');
+      } finally {
+        if (mounted) {
+          setState(() => _isSyncing = false);
+        }
+      }
+    }
   }
 
   @override
   void dispose() {
     SensorService.instance.stop(); // PARAR SHAKE
+    _connectivitySubscription?.cancel();
     super.dispose();
+  }
+
+  // CONNECTIVITY LISTENER
+  void _setupConnectivityListener() {
+    _connectivitySubscription = ConnectivityService.instance.connectionStream.listen((isOnline) {
+      if (mounted) {
+        setState(() {
+          _isOnline = isOnline;
+        });
+
+        if (isOnline) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('🟢 Conectado - Sincronizando...'),
+              backgroundColor: Colors.green,
+              duration: Duration(seconds: 2),
+            ),
+          );
+          _updatePendingSyncCount();
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('🔴 Offline - Mudanças serão sincronizadas quando voltar a conexão'),
+              backgroundColor: Colors.red,
+              duration: Duration(seconds: 3),
+            ),
+          );
+        }
+      }
+    });
+  }
+
+  void _updateOnlineStatus() {
+    setState(() {
+      _isOnline = ConnectivityService.instance.isOnline;
+    });
+  }
+
+  Future<void> _updatePendingSyncCount() async {
+    final count = await SyncService.instance.getPendingCount();
+    if (mounted) {
+      setState(() {
+        _pendingSyncCount = count;
+      });
+    }
   }
 
   // SHAKE DETECTION
@@ -114,7 +196,18 @@ class _TaskListScreenState extends State<TaskListScreen> {
 
       await DatabaseService.instance.update(updated.id!, updated.toMap());
       Navigator.pop(context);
+      
+      // Adicionar à fila de sincronização
+      if (updated.id != null) {
+        await SyncService.instance.queueOperation(
+          taskId: updated.id!,
+          operation: 'UPDATE',
+          task: updated,
+        );
+      }
+      
       await _loadTasks();
+      _updatePendingSyncCount();
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -254,7 +347,18 @@ class _TaskListScreenState extends State<TaskListScreen> {
       }
 
       await DatabaseService.instance.delete(task.id!);
+      
+      // Adicionar à fila de sincronização
+      if (task.id != null) {
+        await SyncService.instance.queueOperation(
+          taskId: task.id!,
+          operation: 'DELETE',
+          task: task,
+        );
+      }
+      
       await _loadTasks();
+      _updatePendingSyncCount();
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -282,7 +386,18 @@ class _TaskListScreenState extends State<TaskListScreen> {
       );
 
       await DatabaseService.instance.update(updated.id!, updated.toMap());
+      
+      // Adicionar à fila de sincronização
+      if (updated.id != null) {
+        await SyncService.instance.queueOperation(
+          taskId: updated.id!,
+          operation: 'UPDATE',
+          task: updated,
+        );
+      }
+      
       await _loadTasks();
+      _updatePendingSyncCount();
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -303,92 +418,324 @@ class _TaskListScreenState extends State<TaskListScreen> {
         backgroundColor: Colors.blue,
         foregroundColor: Colors.white,
         actions: [
+          // Status de conectividade com badge
+          Stack(
+            alignment: Alignment.center,
+            children: [
+              IconButton(
+                icon: Icon(
+                  _isOnline ? Icons.cloud_done : Icons.cloud_off,
+                  color: Colors.white,
+                ),
+                tooltip: _isOnline ? 'Online' : 'Offline',
+                onPressed: () {
+                  showDialog(
+                    context: context,
+                    builder: (context) => AlertDialog(
+                      title: Row(
+                        children: [
+                          Icon(
+                            _isOnline ? Icons.wifi : Icons.wifi_off,
+                            color: _isOnline ? Colors.green : Colors.red,
+                          ),
+                          const SizedBox(width: 8),
+                          Text(_isOnline ? 'Conectado' : 'Offline'),
+                        ],
+                      ),
+                      content: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            _isOnline 
+                                ? 'Você está online. As tarefas serão sincronizadas automaticamente.' 
+                                : 'Você está offline. As alterações serão salvas localmente e sincronizadas quando a conexão for restaurada.',
+                          ),
+                          if (_pendingSyncCount > 0) ...[
+                            const SizedBox(height: 16),
+                            Container(
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: Colors.orange.shade50,
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(color: Colors.orange.shade200),
+                              ),
+                              child: Row(
+                                children: [
+                                  Icon(Icons.sync, color: Colors.orange.shade700),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: Text(
+                                      '$_pendingSyncCount alteraç${_pendingSyncCount > 1 ? 'ões' : 'ão'} aguardando sincronização',
+                                      style: TextStyle(color: Colors.orange.shade900),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                      actions: [
+                        TextButton(
+                          onPressed: () => Navigator.pop(context),
+                          child: const Text('Fechar'),
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              ),
+              // Badge indicador de status
+              if (!_isOnline || _pendingSyncCount > 0)
+                Positioned(
+                  right: 8,
+                  top: 8,
+                  child: Container(
+                    padding: const EdgeInsets.all(4),
+                    decoration: BoxDecoration(
+                      color: !_isOnline ? Colors.red : Colors.orange,
+                      shape: BoxShape.circle,
+                      border: Border.all(color: Colors.white, width: 2),
+                    ),
+                    constraints: const BoxConstraints(
+                      minWidth: 16,
+                      minHeight: 16,
+                    ),
+                    child: _pendingSyncCount > 0
+                        ? Text(
+                            _pendingSyncCount > 9 ? '9+' : '$_pendingSyncCount',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                            ),
+                            textAlign: TextAlign.center,
+                          )
+                        : null,
+                  ),
+                ),
+            ],
+          ),
+          // Filtros
+          Stack(
+            alignment: Alignment.center,
+            children: [
+              PopupMenuButton<String>(
+                icon: const Icon(Icons.filter_list),
+                tooltip: 'Filtrar tarefas',
+                onSelected: (value) {
+                  if (value == 'nearby') {
+                    _filterByNearby();
+                  } else {
+                    setState(() {
+                      _filter = value;
+                      if (value != 'nearby') _loadTasks();
+                    });
+                  }
+                },
+                itemBuilder: (context) => [
+                  PopupMenuItem(
+                    value: 'all',
+                    child: Row(
+                      children: [
+                        Icon(Icons.list_alt, color: _filter == 'all' ? Colors.blue : null),
+                        const SizedBox(width: 8),
+                        Text('Todas', style: TextStyle(fontWeight: _filter == 'all' ? FontWeight.bold : null)),
+                      ],
+                    ),
+                  ),
+                  PopupMenuItem(
+                    value: 'pending',
+                    child: Row(
+                      children: [
+                        Icon(Icons.pending_outlined, color: _filter == 'pending' ? Colors.blue : null),
+                        const SizedBox(width: 8),
+                        Text('Pendentes', style: TextStyle(fontWeight: _filter == 'pending' ? FontWeight.bold : null)),
+                      ],
+                    ),
+                  ),
+                  PopupMenuItem(
+                    value: 'completed',
+                    child: Row(
+                      children: [
+                        Icon(Icons.check_circle_outline, color: _filter == 'completed' ? Colors.blue : null),
+                        const SizedBox(width: 8),
+                        Text('Concluídas', style: TextStyle(fontWeight: _filter == 'completed' ? FontWeight.bold : null)),
+                      ],
+                    ),
+                  ),
+                  PopupMenuItem(
+                    value: 'nearby',
+                    child: Row(
+                      children: [
+                        Icon(Icons.near_me, color: _filter == 'nearby' ? Colors.blue : null),
+                        const SizedBox(width: 8),
+                        Text('Próximas', style: TextStyle(fontWeight: _filter == 'nearby' ? FontWeight.bold : null)),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              // Badge indicador de filtro ativo
+              if (_filter != 'all')
+                Positioned(
+                  right: 8,
+                  top: 8,
+                  child: Container(
+                    width: 8,
+                    height: 8,
+                    decoration: BoxDecoration(
+                      color: Colors.orange,
+                      shape: BoxShape.circle,
+                      border: Border.all(color: Colors.white, width: 1.5),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+          // Sincronização manual
+          IconButton(
+            icon: _isSyncing 
+                ? const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                    ),
+                  )
+                : const Icon(Icons.sync),
+            tooltip: 'Sincronizar',
+            onPressed: (_isOnline && !_isSyncing) ? () async {
+              try {
+                print('===== SINCRONIZAÇÃO MANUAL INICIADA =====');
+                setState(() => _isSyncing = true);
+                
+                await SyncService.instance.forceSyncNow();
+                await _loadTasks();
+                _updatePendingSyncCount();
+                
+                print('===== SINCRONIZAÇÃO MANUAL CONCLUÍDA =====');
+                
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('✓ Sincronização concluída'),
+                      backgroundColor: Colors.green,
+                      duration: Duration(seconds: 2),
+                    ),
+                  );
+                }
+              } catch (e) {
+                print('Erro na sincronização manual: $e');
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Erro: $e'),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                }
+              } finally {
+                if (mounted) {
+                  setState(() => _isSyncing = false);
+                }
+              }
+            } : null,
+          ),
+          // Menu de informações
           PopupMenuButton<String>(
-            icon: const Icon(Icons.filter_list),
+            icon: const Icon(Icons.more_vert),
+            tooltip: 'Mais opções',
             onSelected: (value) {
-              if (value == 'nearby') {
-                _filterByNearby();
-              } else {
-                setState(() {
-                  _filter = value;
-                  if (value != 'nearby') _loadTasks();
-                });
+              if (value == 'tips') {
+                showDialog(
+                  context: context,
+                  builder: (context) => AlertDialog(
+                    title: const Text('💡 Dicas de Uso'),
+                    content: SingleChildScrollView(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: const [
+                          Text('• Toque no card para editar'),
+                          SizedBox(height: 8),
+                          Text('• Marque como completa com checkbox'),
+                          SizedBox(height: 8),
+                          Text('• Sacuda o celular para completar rápido!'),
+                          SizedBox(height: 8),
+                          Text('• Use filtros para organizar'),
+                          SizedBox(height: 8),
+                          Text('• Adicione fotos e localização'),
+                          SizedBox(height: 8),
+                          Text('• Modo offline: alterações sincronizam automaticamente'),
+                        ],
+                      ),
+                    ),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(context),
+                        child: const Text('Entendi'),
+                      ),
+                    ],
+                  ),
+                );
+              } else if (value == 'about') {
+                showDialog(
+                  context: context,
+                  builder: (context) => AlertDialog(
+                    title: const Text('📱 Sobre'),
+                    content: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: const [
+                        Text('Task Manager', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+                        SizedBox(height: 8),
+                        Text('Versão 1.0.0'),
+                        SizedBox(height: 16),
+                        Text('Recursos:'),
+                        SizedBox(height: 8),
+                        Text('✓ Modo Offline-First'),
+                        Text('✓ Sincronização automática'),
+                        Text('✓ Detecção de shake'),
+                        Text('✓ Câmera integrada'),
+                        Text('✓ Geolocalização'),
+                        Text('✓ Filtros inteligentes'),
+                      ],
+                    ),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(context),
+                        child: const Text('Fechar'),
+                      ),
+                    ],
+                  ),
+                );
               }
             },
             itemBuilder: (context) => [
               const PopupMenuItem(
-                value: 'all',
+                value: 'tips',
                 child: Row(
                   children: [
-                    Icon(Icons.list_alt),
+                    Icon(Icons.lightbulb_outline),
                     SizedBox(width: 8),
-                    Text('Todas'),
+                    Text('Dicas de Uso'),
                   ],
                 ),
               ),
               const PopupMenuItem(
-                value: 'pending',
+                value: 'about',
                 child: Row(
                   children: [
-                    Icon(Icons.pending_outlined),
+                    Icon(Icons.info_outline),
                     SizedBox(width: 8),
-                    Text('Pendentes'),
-                  ],
-                ),
-              ),
-              const PopupMenuItem(
-                value: 'completed',
-                child: Row(
-                  children: [
-                    Icon(Icons.check_circle_outline),
-                    SizedBox(width: 8),
-                    Text('Concluídas'),
-                  ],
-                ),
-              ),
-              const PopupMenuItem(
-                value: 'nearby',
-                child: Row(
-                  children: [
-                    Icon(Icons.near_me),
-                    SizedBox(width: 8),
-                    Text('Próximas'),
+                    Text('Sobre o App'),
                   ],
                 ),
               ),
             ],
-          ),
-          IconButton(
-            icon: const Icon(Icons.info_outline),
-            onPressed: () {
-              showDialog(
-                context: context,
-                builder: (context) => AlertDialog(
-                  title: const Text('💡 Dicas'),
-                  content: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: const [
-                      Text('• Toque no card para editar'),
-                      SizedBox(height: 8),
-                      Text('• Marque como completa com checkbox'),
-                      SizedBox(height: 8),
-                      Text('• Sacuda o celular para completar rápido!'),
-                      SizedBox(height: 8),
-                      Text('• Use filtros para organizar'),
-                      SizedBox(height: 8),
-                      Text('• Adicione fotos e localização'),
-                    ],
-                  ),
-                  actions: [
-                    TextButton(
-                      onPressed: () => Navigator.pop(context),
-                      child: const Text('Entendi'),
-                    ),
-                  ],
-                ),
-              );
-            },
           ),
         ],
       ),
