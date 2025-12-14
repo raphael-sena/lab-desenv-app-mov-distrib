@@ -9,3 +9,4 @@ yarn-error.log*
 !logs/
 !logs/.gitkeep
 logs/*.log
+!logs/snsSubscriber.log
