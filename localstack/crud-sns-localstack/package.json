@@ -1,0 +1,25 @@
+{
+  "name": "crud-sns-localstack",
+  "version": "1.0.0",
+  "private": true,
+  "description": "CRUD Serverless (API Gateway + Lambda + DynamoDB) with SNS notifications using LocalStack",
+  "main": "src/handlers/createItem.js",
+  "scripts": {
+    "dev:localstack": "docker compose up -d",
+    "down:localstack": "docker compose down -v",
+    "deploy:local": "serverless deploy --stage local",
+    "remove:local": "serverless remove --stage local",
+    "logs:subscriber": "serverless logs -f snsSubscriber --stage local --tail",
+    "smoke": "bash scripts/smoke-test.sh"
+  },
+  "dependencies": {
+    "@aws-sdk/client-dynamodb": "^3.600.0",
+    "@aws-sdk/lib-dynamodb": "^3.600.0",
+    "@aws-sdk/client-sns": "^3.600.0",
+    "uuid": "^9.0.1"
+  },
+  "devDependencies": {
+    "serverless": "^3.39.0",
+    "serverless-localstack": "^1.1.2"
+  }
+}
