@@ -68,12 +68,13 @@ Write-Host "EXECUTANDO TESTE DE CHECKOUT" -ForegroundColor Cyan
 Write-Host "========================================" -ForegroundColor Cyan
 Write-Host ""
 
-# Navegar para o diretorio do projeto
+# Navegar para o diretorio raiz do projeto (um nivel acima de scripts/)
 $scriptPath = Split-Path -Parent $MyInvocation.MyCommand.Path
-Set-Location $scriptPath
+$projectRoot = Split-Path -Parent $scriptPath
+Set-Location $projectRoot
 
-# Executar o teste
-node test-checkout-rabbitmq.js
+# Executar o teste (arquivo esta em tests/)
+node tests/test-checkout-rabbitmq.js
 
 Write-Host ""
 Write-Host "========================================" -ForegroundColor Cyan

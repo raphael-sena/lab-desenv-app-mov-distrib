@@ -27,14 +27,15 @@ try {
     Write-Host ""
 }
 
-# Navegar para o diretório do consumer
+# Navegar para o diretório raiz do projeto (um nivel acima de scripts/)
 $scriptPath = Split-Path -Parent $MyInvocation.MyCommand.Path
-Set-Location $scriptPath
+$projectRoot = Split-Path -Parent $scriptPath
+Set-Location $projectRoot
 
 # Verificar se as dependências estão instaladas
-if (-not (Test-Path "node_modules")) {
+if (-not (Test-Path "consumers/node_modules")) {
     Write-Host "📦 Instalando dependências..." -ForegroundColor Yellow
-    npm install amqplib
+    cd consumers; npm install amqplib; cd ..
 }
 
 Write-Host ""

@@ -29,14 +29,15 @@ try {
     exit 1
 }
 
-# Navegar para o diretorio raiz
+# Navegar para o diretorio raiz do projeto (um nivel acima de scripts/)
 $scriptPath = Split-Path -Parent $MyInvocation.MyCommand.Path
-Set-Location $scriptPath
+$projectRoot = Split-Path -Parent $scriptPath
+Set-Location $projectRoot
 
-# Verificar se as dependencias estao instaladas
-if (-not (Test-Path "node_modules")) {
-    Write-Host "Instalando dependencias..." -ForegroundColor Yellow
-    npm install amqplib
+# Verificar se as dependencias estao instaladas na pasta consumers
+if (-not (Test-Path "consumers/node_modules")) {
+    Write-Host "Instalando dependencias dos consumers..." -ForegroundColor Yellow
+    Push-Location consumers; npm install; Pop-Location
 }
 
 Write-Host ""
@@ -44,14 +45,14 @@ Write-Host "Iniciando Consumers em janelas separadas..." -ForegroundColor Green
 Write-Host ""
 
 # Iniciar Notification Consumer em nova janela
-Start-Process powershell -ArgumentList "-NoExit", "-Command", "cd '$scriptPath'; node consumers/notification-consumer.js"
+Start-Process powershell -ArgumentList "-NoExit", "-Command", "cd '$projectRoot'; node consumers/notification-consumer.js"
 Write-Host "OK Notification Consumer iniciado" -ForegroundColor Green
 
 # Aguardar um pouco antes de iniciar o proximo
 Start-Sleep -Seconds 1
 
 # Iniciar Analytics Consumer em nova janela
-Start-Process powershell -ArgumentList "-NoExit", "-Command", "cd '$scriptPath'; node consumers/analytics-consumer.js"
+Start-Process powershell -ArgumentList "-NoExit", "-Command", "cd '$projectRoot'; node consumers/analytics-consumer.js"
 Write-Host "OK Analytics Consumer iniciado" -ForegroundColor Green
 
 Write-Host ""
